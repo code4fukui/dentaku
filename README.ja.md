@@ -18,6 +18,7 @@ English README:
 - SI接頭語記号CSVを読み込み
   - https://code4fukui.github.io/music-numeral-system/numeral-system.en.csv
 - 負の整数に対応
+- `1,234,567` のようなコンマ付き数値に対応
 - `2M`、`3.2R`、`1G234M567k890` のようなSI記号付き入力に対応
 - 操作用ボタン
   - 自乗

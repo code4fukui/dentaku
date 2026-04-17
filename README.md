@@ -18,6 +18,7 @@ Japanese README:
 - Loads SI prefix symbols from:
   - https://code4fukui.github.io/music-numeral-system/numeral-system.en.csv
 - Supports negative integers
+- Allows comma-separated numbers such as `1,234,567`
 - Accepts SI symbol input such as `2M`, `3.2R`, and `1G234M567k890`
 - Provides utility buttons:
   - square
