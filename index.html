@@ -53,6 +53,20 @@
       font-size: 1rem;
     }
 
+    .source-link {
+      display: block;
+      width: fit-content;
+      margin: 24px 0 0 auto;
+      color: var(--muted);
+      font-size: .82rem;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+
+    .source-link:hover {
+      color: var(--accent-strong);
+    }
+
     .tool {
       display: grid;
       gap: 18px;
@@ -182,6 +196,7 @@
 
     <p id="maxInfo" class="examples"></p>
     <p class="examples">例: 0 / 10000 / -9007199254740993 / 123456789012345678901234567890</p>
+    <a class="source-link" href="https://github.com/code4fukui/dentaku">src on GitHub</a>
   </main>
 
   <script type="module">
