@@ -15,7 +15,10 @@ Japanese README:
 - Converts arbitrary-size integers to kanji numerals using `BigInt`
 - Loads Japanese numeral units from:
   - https://code4fukui.github.io/music-numeral-system/numeral-system.ja.csv
+- Loads SI prefix symbols from:
+  - https://code4fukui.github.io/music-numeral-system/numeral-system.en.csv
 - Supports negative integers
+- Accepts SI symbol input such as `2M`, `3.2R`, and `1G234M567k890`
 - Provides utility buttons:
   - square
   - integer square root
@@ -55,6 +58,10 @@ Opening the file directly may fail to load the CSV depending on browser security
 ## Notes
 
 The app does not include fallback numeral data. If the CSV cannot be fetched, it shows an error instead of converting.
+
+SI symbol input is converted exactly as decimal text, not as floating-point math. For example, `2M` means `2 * 10^6`, `3.2R` means `3.2 * 10^27`, and `1G234M567k890` means `1,234,567,890`.
+
+When the input is a single SI-symbol value, the `multiply by 10` and `divide by 10` buttons keep the symbol in the input field. For example, `1Q` becomes `10Q`, and dividing `1Q` by 10 becomes `0.1Q`.
 
 ## License
 
