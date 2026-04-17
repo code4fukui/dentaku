@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>bigint 漢数字変換</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f2;
+      --panel: #ffffff;
+      --text: #202124;
+      --muted: #657077;
+      --line: #d9ded8;
+      --accent: #0d6f6e;
+      --accent-strong: #084f4e;
+      --error: #b42318;
+      --shadow: 0 18px 42px rgb(38 50 56 / 12%);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(135deg, rgb(13 111 110 / 10%), transparent 36%),
+        linear-gradient(315deg, rgb(222 93 64 / 10%), transparent 34%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+
+    main {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 48px 0;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(2rem, 5vw, 4.5rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 0 0 28px;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .tool {
+      display: grid;
+      gap: 18px;
+      padding: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    label {
+      display: grid;
+      gap: 8px;
+      font-weight: 700;
+    }
+
+    textarea,
+    output {
+      width: 100%;
+      min-height: 138px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfb;
+      color: var(--text);
+      font: 1.05rem/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      overflow-wrap: anywhere;
+      resize: vertical;
+    }
+
+    textarea:focus {
+      outline: 3px solid rgb(13 111 110 / 18%);
+      border-color: var(--accent);
+    }
+
+    output {
+      display: block;
+      white-space: pre-wrap;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      min-height: 44px;
+      padding: 0 18px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: var(--accent-strong);
+    }
+
+    button.secondary {
+      background: #e9efee;
+      color: var(--accent-strong);
+    }
+
+    .status {
+      min-height: 1.5em;
+      color: var(--muted);
+      font-size: .95rem;
+    }
+
+    .status.error {
+      color: var(--error);
+      font-weight: 700;
+    }
+
+    .examples {
+      margin-top: 20px;
+      color: var(--muted);
+      font-size: .95rem;
+    }
+
+    @media (max-width: 640px) {
+      main {
+        width: min(100% - 24px, 960px);
+        padding: 28px 0;
+      }
+
+      .tool {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>bigint 漢数字変換</h1>
+    <p class="lead">CSVの数詞体系を読み込み、任意精度整数を漢数字へ変換します。</p>
+
+    <section class="tool" aria-label="漢数字変換">
+      <label>
+        bigint
+        <textarea id="input" inputmode="numeric" spellcheck="false">2</textarea>
+      </label>
+
+      <div class="actions">
+        <button id="convert" type="button">変換</button>
+        <button id="square" class="secondary" type="button">自乗</button>
+        <button id="sqrt" class="secondary" type="button">平方根</button>
+        <button id="times10" class="secondary" type="button">10倍</button>
+        <button id="divide10" class="secondary" type="button">1/10</button>
+        <button id="max" class="secondary" type="button">最大値</button>
+        <button id="clear" class="secondary" type="button">クリア</button>
+        <button id="copy" class="secondary" type="button">コピー</button>
+      </div>
+
+      <label>
+        漢数字
+        <output id="output" for="input"></output>
+      </label>
+
+      <div id="status" class="status" role="status"></div>
+    </section>
+
+    <p id="maxInfo" class="examples"></p>
+    <p class="examples">例: 0 / 10000 / -9007199254740993 / 123456789012345678901234567890</p>
+  </main>
+
+  <script type="module">
+    const CSV_URL = "https://code4fukui.github.io/music-numeral-system/numeral-system.ja.csv";
+
+    const input = document.querySelector("#input");
+    const output = document.querySelector("#output");
+    const status = document.querySelector("#status");
+    const maxInfo = document.querySelector("#maxInfo");
+    const convertButton = document.querySelector("#convert");
+    const squareButton = document.querySelector("#square");
+    const sqrtButton = document.querySelector("#sqrt");
+    const times10Button = document.querySelector("#times10");
+    const divide10Button = document.querySelector("#divide10");
+    const maxButton = document.querySelector("#max");
+    const clearButton = document.querySelector("#clear");
+    const copyButton = document.querySelector("#copy");
+    const DIGIT_KANJI = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+
+    let numeralSystem = null;
+
+    const parseCsv = (text) => {
+      const rows = text.trim().split(/\r?\n/).map((line) => line.split(","));
+      const header = rows.shift();
+      const powerIndex = header.indexOf("power10");
+      const kanjiIndex = header.indexOf("kanji");
+
+      if (powerIndex < 0 || kanjiIndex < 0) {
+        throw new Error("CSVに power10 または kanji 列がありません。");
+      }
+
+      return rows.reduce((table, row) => {
+        const power = Number(row[powerIndex].replace("10^", ""));
+        table.set(power, row[kanjiIndex]);
+        return table;
+      }, new Map());
+    };
+
+    const loadNumeralSystem = async () => {
+      const response = await fetch(CSV_URL, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`${response.status} ${response.statusText}`);
+      }
+      status.textContent = `CSV読み込み済み: ${CSV_URL}`;
+      status.classList.remove("error");
+      return parseCsv(await response.text());
+    };
+
+    const getMaxPower = (table) => Math.max(...table.keys().filter((power) => power % 4 === 0));
+
+    const getMaxValue = (table) => 10n ** BigInt(getMaxPower(table) + 4) - 1n;
+
+    const updateMaxInfo = () => {
+      const maxPower = getMaxPower(numeralSystem);
+      maxInfo.textContent = `表現できる最大値: 10^${maxPower + 4} - 1（最大単位: ${numeralSystem.get(maxPower)}）`;
+    };
+
+    const groupToKanji = (group, table) => {
+      const digits = String(group).padStart(4, "0").split("").map(Number);
+      const powers = [3, 2, 1, 0];
+      let result = "";
+
+      for (let i = 0; i < digits.length; i += 1) {
+        const digit = digits[i];
+        const power = powers[i];
+        if (digit === 0) continue;
+
+        const digitKanji = DIGIT_KANJI[digit];
+        const unitKanji = power === 0 ? "" : table.get(power);
+        if (!digitKanji || unitKanji === undefined) {
+          throw new Error("CSVの単位データが不足しています。");
+        }
+
+        result += digit === 1 && power > 0 ? unitKanji : `${digitKanji}${unitKanji}`;
+      }
+
+      return result;
+    };
+
+    const bigintToKanji = (value, table) => {
+      if (value === 0n) return "零";
+
+      const sign = value < 0n ? "負" : "";
+      const normalized = (value < 0n ? -value : value).toString();
+      const groups = [];
+
+      for (let end = normalized.length; end > 0; end -= 4) {
+        groups.unshift(Number(normalized.slice(Math.max(0, end - 4), end)));
+      }
+
+      const maxPower = (groups.length - 1) * 4;
+      if (!table.has(maxPower)) {
+        const tableMaxPower = getMaxPower(table);
+        throw new Error(`このCSVで変換できる最大値は 10^${tableMaxPower + 4} - 1 です。`);
+      }
+
+      const body = groups
+        .map((group, index) => {
+          if (group === 0) return "";
+          const power = (groups.length - index - 1) * 4;
+          const groupKanji = groupToKanji(group, table);
+          const largeUnit = power === 0 ? "" : table.get(power);
+          if (largeUnit === undefined) {
+            throw new Error(`10^${power} の単位がCSVにありません。`);
+          }
+          return `${groupKanji}${largeUnit}`;
+        })
+        .join("");
+
+      return `${sign}${body}`;
+    };
+
+    const normalizeInput = (text) => text.replace(/[,，_\s]/g, "");
+
+    const getInputBigInt = () => {
+      const raw = normalizeInput(input.value);
+      if (!/^[+-]?\d+$/.test(raw)) {
+        throw new Error("整数を入力してください。");
+      }
+      return BigInt(raw);
+    };
+
+    const setInputBigInt = (value) => {
+      input.value = value.toString();
+      convert();
+    };
+
+    const integerSqrt = (value) => {
+      if (value < 0n) {
+        throw new Error("負の数の平方根は計算できません。");
+      }
+      if (value < 2n) return value;
+
+      let small = 1n;
+      let large = value;
+      while (small <= large) {
+        const middle = (small + large) / 2n;
+        const square = middle * middle;
+        if (square === value) return middle;
+        if (square < value) {
+          small = middle + 1n;
+        } else {
+          large = middle - 1n;
+        }
+      }
+      return large;
+    };
+
+    const convert = () => {
+      if (!numeralSystem) return;
+
+      const raw = normalizeInput(input.value);
+      try {
+        if (!/^[+-]?\d+$/.test(raw)) {
+          throw new Error("整数を入力してください。");
+        }
+        output.value = bigintToKanji(BigInt(raw), numeralSystem);
+        status.classList.remove("error");
+        if (!status.textContent) status.textContent = "変換しました。";
+      } catch (error) {
+        output.value = "";
+        status.textContent = error.message;
+        status.classList.add("error");
+      }
+    };
+
+    convertButton.addEventListener("click", convert);
+    input.addEventListener("input", convert);
+    squareButton.addEventListener("click", () => {
+      try {
+        const value = getInputBigInt();
+        setInputBigInt(value * value);
+      } catch (error) {
+        output.value = "";
+        status.textContent = error.message;
+        status.classList.add("error");
+      }
+    });
+    sqrtButton.addEventListener("click", () => {
+      try {
+        setInputBigInt(integerSqrt(getInputBigInt()));
+      } catch (error) {
+        output.value = "";
+        status.textContent = error.message;
+        status.classList.add("error");
+      }
+    });
+    times10Button.addEventListener("click", () => {
+      try {
+        setInputBigInt(getInputBigInt() * 10n);
+      } catch (error) {
+        output.value = "";
+        status.textContent = error.message;
+        status.classList.add("error");
+      }
+    });
+    divide10Button.addEventListener("click", () => {
+      try {
+        setInputBigInt(getInputBigInt() / 10n);
+      } catch (error) {
+        output.value = "";
+        status.textContent = error.message;
+        status.classList.add("error");
+      }
+    });
+    maxButton.addEventListener("click", () => {
+      setInputBigInt(getMaxValue(numeralSystem));
+    });
+    clearButton.addEventListener("click", () => {
+      input.value = "";
+      output.value = "";
+      status.textContent = "";
+      status.classList.remove("error");
+      input.focus();
+    });
+    copyButton.addEventListener("click", async () => {
+      if (!output.value) return;
+      await navigator.clipboard.writeText(output.value);
+      status.textContent = "コピーしました。";
+      status.classList.remove("error");
+    });
+
+    try {
+      numeralSystem = await loadNumeralSystem();
+      updateMaxInfo();
+      convert();
+    } catch (error) {
+      status.textContent = `CSVの取得に失敗しました: ${error.message}`;
+      status.classList.add("error");
+    }
+  </script>
+</body>
+</html>
