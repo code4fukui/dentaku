@@ -13,10 +13,7 @@ English README:
 ## 機能
 
 - 任意精度整数を漢数字に変換
-- 日本語の数詞単位CSVを読み込み
-  - https://code4fukui.github.io/music-numeral-system/numeral-system.ja.csv
-- SI接頭語記号CSVを読み込み
-  - https://code4fukui.github.io/music-numeral-system/numeral-system.en.csv
+- 日本語の数詞単位とSI接頭語記号を組み込みデータとして利用
 - 負の整数に対応
 - `1,234,567` のようなコンマ付き数値に対応
 - `2M`、`3.2R`、`1G234M567k890` のようなSI記号付き入力に対応
@@ -28,13 +25,36 @@ English README:
   - 最大値
   - クリア
   - コピー
-- 読み込んだCSVで表現できる最大値を表示
+- 組み込み数詞データで表現できる最大値を表示
+
+## データ出典
+
+数詞データは [numconverter.js](numconverter.js) に組み込んでいます。元データは以下です。
+
+- https://github.com/code4fukui/music-numeral-system/blob/main/numeral-system.ja.csv
+- https://github.com/code4fukui/music-numeral-system/blob/main/numeral-system.en.csv
+
+## ESモジュール
+
+変換ロジックは [numconverter.js](numconverter.js) から利用できます。
+
+```js
+import {
+  NUMERAL_SYSTEM,
+  SI_SYMBOL_SYSTEM,
+  bigintToKanji,
+  parseSiInputBigInt,
+} from "./numconverter.js";
+
+const value = parseSiInputBigInt("3.2R", SI_SYMBOL_SYSTEM);
+console.log(bigintToKanji(value, NUMERAL_SYSTEM));
+```
 
 ## 最大値
 
-このアプリは数字を4桁ごとに区切り、CSVに含まれる最大の10冪単位を使って変換します。
+このアプリは数字を4桁ごとに区切り、組み込み数詞データに含まれる最大の10冪単位を使って変換します。
 
-現在のCSVでは最大単位が `10^68` の `無量大数` なので、表現できる最大値は次の通りです。
+現在のデータでは最大単位が `10^68` の `無量大数` なので、表現できる最大値は次の通りです。
 
 ```txt
 10^72 - 1
@@ -54,11 +74,11 @@ python3 -m http.server 8000
 http://localhost:8000/
 ```
 
-ブラウザのセキュリティ制限により、HTMLファイルを直接開くとCSVを読み込めない場合があります。ローカルサーバー経由での実行を推奨します。
+ESモジュールを使っているため、HTMLファイルを直接開くとブラウザによっては動作しない場合があります。ローカルサーバー経由での実行を推奨します。
 
 ## 補足
 
-CSVを取得できない場合のフォールバックデータは含めていません。CSV取得に失敗した場合はエラーを表示し、変換は行いません。
+実行時にCSVファイルは取得しません。数詞データはESモジュールに組み込んでいます。
 
 SI記号付き入力は浮動小数点数ではなく、文字列から正確に整数へ変換します。たとえば `2M` は `2 * 10^6`、`3.2R` は `3.2 * 10^27`、`1G234M567k890` は `1,234,567,890` として扱います。
 

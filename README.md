@@ -13,10 +13,7 @@ Japanese README:
 ## Features
 
 - Converts arbitrary-size integers to kanji numerals using `BigInt`
-- Loads Japanese numeral units from:
-  - https://code4fukui.github.io/music-numeral-system/numeral-system.ja.csv
-- Loads SI prefix symbols from:
-  - https://code4fukui.github.io/music-numeral-system/numeral-system.en.csv
+- Uses embedded Japanese numeral units and SI prefix symbols
 - Supports negative integers
 - Allows comma-separated numbers such as `1,234,567`
 - Accepts SI symbol input such as `2M`, `3.2R`, and `1G234M567k890`
@@ -28,13 +25,36 @@ Japanese README:
   - maximum representable value
   - clear
   - copy result
-- Shows the maximum value representable by the loaded CSV
+- Shows the maximum value representable by the embedded numeral data
+
+## Data Sources
+
+The numeral data is embedded in [numconverter.js](numconverter.js). It is based on:
+
+- https://github.com/code4fukui/music-numeral-system/blob/main/numeral-system.ja.csv
+- https://github.com/code4fukui/music-numeral-system/blob/main/numeral-system.en.csv
+
+## ES Module
+
+The conversion logic is available from [numconverter.js](numconverter.js):
+
+```js
+import {
+  NUMERAL_SYSTEM,
+  SI_SYMBOL_SYSTEM,
+  bigintToKanji,
+  parseSiInputBigInt,
+} from "./numconverter.js";
+
+const value = parseSiInputBigInt("3.2R", SI_SYMBOL_SYSTEM);
+console.log(bigintToKanji(value, NUMERAL_SYSTEM));
+```
 
 ## Maximum Value
 
-The app groups digits by 4 and uses the largest 10-power unit available in the CSV.
+The app groups digits by 4 and uses the largest 10-power unit available in the embedded numeral data.
 
-With the current CSV, the largest unit is `10^68` (`無量大数`), so the largest representable value is:
+With the current data, the largest unit is `10^68` (`無量大数`), so the largest representable value is:
 
 ```txt
 10^72 - 1
@@ -54,11 +74,11 @@ Then open:
 http://localhost:8000/
 ```
 
-Opening the file directly may fail to load the CSV depending on browser security settings, so using a local server is recommended.
+Opening the file directly may fail because the app uses ES modules, so using a local server is recommended.
 
 ## Notes
 
-The app does not include fallback numeral data. If the CSV cannot be fetched, it shows an error instead of converting.
+The app does not fetch CSV files at runtime. Numeral data is bundled in the ES module.
 
 SI symbol input is converted exactly as decimal text, not as floating-point math. For example, `2M` means `2 * 10^6`, `3.2R` means `3.2 * 10^27`, and `1G234M567k890` means `1,234,567,890`.
 

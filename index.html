@@ -176,7 +176,7 @@
 <body>
   <main>
     <h1>bigint 漢数字変換</h1>
-    <p class="lead">CSVの数詞体系を読み込み、任意精度整数を漢数字へ変換します。</p>
+    <p class="lead">任意精度整数やSI記号付き数値を、組み込み数詞データで漢数字へ変換します。</p>
 
     <section class="tool" aria-label="漢数字変換">
       <label>
@@ -209,8 +209,16 @@
   </main>
 
   <script type="module">
-    const CSV_URL = "https://code4fukui.github.io/music-numeral-system/numeral-system.ja.csv";
-    const SI_CSV_URL = "https://code4fukui.github.io/music-numeral-system/numeral-system.en.csv";
+    import {
+      NUMERAL_SYSTEM,
+      SI_SYMBOL_SYSTEM,
+      bigintToKanji,
+      getMaxPower,
+      getMaxValue,
+      parseSiInputBigInt,
+      parseSingleSiInput,
+      scaleDecimalBy10,
+    } from "./numconverter.js";
 
     const input = document.querySelector("#input");
     const output = document.querySelector("#output");
@@ -224,229 +232,18 @@
     const maxButton = document.querySelector("#max");
     const clearButton = document.querySelector("#clear");
     const copyButton = document.querySelector("#copy");
-    const DIGIT_KANJI = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
-
-    let numeralSystem = null;
-    let siSymbolSystem = null;
-
-    const parseCsv = (text) => {
-      const rows = text.trim().split(/\r?\n/).map((line) => line.split(","));
-      const header = rows.shift();
-      const powerIndex = header.indexOf("power10");
-      const kanjiIndex = header.indexOf("kanji");
-
-      if (powerIndex < 0 || kanjiIndex < 0) {
-        throw new Error("CSVに power10 または kanji 列がありません。");
-      }
-
-      return rows.reduce((table, row) => {
-        const power = Number(row[powerIndex].replace("10^", ""));
-        table.set(power, row[kanjiIndex]);
-        return table;
-      }, new Map());
-    };
-
-    const parseSiCsv = (text) => {
-      const rows = text.trim().split(/\r?\n/).map((line) => line.split(","));
-      const header = rows.shift();
-      const powerIndex = header.indexOf("power10");
-      const symbolIndex = header.indexOf("symbol");
-
-      if (powerIndex < 0 || symbolIndex < 0) {
-        throw new Error("CSVに power10 または symbol 列がありません。");
-      }
-
-      return rows.reduce((table, row) => {
-        const symbol = row[symbolIndex];
-        const power = Number(row[powerIndex].replace("10^", ""));
-        if (symbol) table.set(symbol, power);
-        return table;
-      }, new Map());
-    };
-
-    const fetchCsv = async (url) => {
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(`${response.status} ${response.statusText}`);
-      }
-      return response.text();
-    };
-
-    const setCsvLoadedStatus = (urls) => {
-      status.replaceChildren("CSV読み込み済み:");
-      for (const url of urls) {
-        const link = document.createElement("a");
-        link.href = url;
-        link.textContent = url;
-        status.append(document.createElement("br"), link);
-      }
-    };
-
-    const loadNumeralSystems = async () => {
-      const [jaCsv, siCsv] = await Promise.all([
-        fetchCsv(CSV_URL),
-        fetchCsv(SI_CSV_URL),
-      ]);
-      status.classList.remove("error");
-      setCsvLoadedStatus([CSV_URL, SI_CSV_URL]);
-      return {
-        numeral: parseCsv(jaCsv),
-        siSymbols: parseSiCsv(siCsv),
-      };
-    };
-
-    const getMaxPower = (table) => Math.max(...table.keys().filter((power) => power % 4 === 0));
-
-    const getMaxValue = (table) => 10n ** BigInt(getMaxPower(table) + 4) - 1n;
 
     const updateMaxInfo = () => {
-      const maxPower = getMaxPower(numeralSystem);
-      const symbols = [...siSymbolSystem.entries()]
+      const maxPower = getMaxPower(NUMERAL_SYSTEM);
+      const symbols = [...SI_SYMBOL_SYSTEM.entries()]
         .sort((a, b) => a[1] - b[1])
         .map(([symbol, power]) => `${symbol}=10^${power}`)
         .join(" / ");
-      maxInfo.textContent = `表現できる最大値: 10^${maxPower + 4} - 1（最大単位: ${numeralSystem.get(maxPower)}）\n使えるSI単位系: ${symbols}`;
-    };
-
-    const groupToKanji = (group, table) => {
-      const digits = String(group).padStart(4, "0").split("").map(Number);
-      const powers = [3, 2, 1, 0];
-      let result = "";
-
-      for (let i = 0; i < digits.length; i += 1) {
-        const digit = digits[i];
-        const power = powers[i];
-        if (digit === 0) continue;
-
-        const digitKanji = DIGIT_KANJI[digit];
-        const unitKanji = power === 0 ? "" : table.get(power);
-        if (!digitKanji || unitKanji === undefined) {
-          throw new Error("CSVの単位データが不足しています。");
-        }
-
-        result += digit === 1 && power > 0 ? unitKanji : `${digitKanji}${unitKanji}`;
-      }
-
-      return result;
-    };
-
-    const bigintToKanji = (value, table) => {
-      if (value === 0n) return "零";
-
-      const sign = value < 0n ? "負" : "";
-      const normalized = (value < 0n ? -value : value).toString();
-      const groups = [];
-
-      for (let end = normalized.length; end > 0; end -= 4) {
-        groups.unshift(Number(normalized.slice(Math.max(0, end - 4), end)));
-      }
-
-      const maxPower = (groups.length - 1) * 4;
-      if (!table.has(maxPower)) {
-        const tableMaxPower = getMaxPower(table);
-        throw new Error(`このCSVで変換できる最大値は 10^${tableMaxPower + 4} - 1 です。`);
-      }
-
-      const body = groups
-        .map((group, index) => {
-          if (group === 0) return "";
-          const power = (groups.length - index - 1) * 4;
-          const groupKanji = groupToKanji(group, table);
-          const largeUnit = power === 0 ? "" : table.get(power);
-          if (largeUnit === undefined) {
-            throw new Error(`10^${power} の単位がCSVにありません。`);
-          }
-          return `${groupKanji}${largeUnit}`;
-        })
-        .join("");
-
-      return `${sign}${body}`;
-    };
-
-    const normalizeInput = (text) => text.replace(/[,，_\s]/g, "");
-
-    const parseInputBigInt = (text) => {
-      const raw = normalizeInput(text);
-      if (!raw) {
-        throw new Error("整数を入力してください。");
-      }
-
-      const sign = raw.startsWith("-") ? -1n : 1n;
-      const unsigned = raw.replace(/^[+-]/, "");
-      if (!unsigned) {
-        throw new Error("整数を入力してください。");
-      }
-
-      let index = 0;
-      let total = 0n;
-      const symbols = [...siSymbolSystem.keys()].sort((a, b) => b.length - a.length);
-
-      while (index < unsigned.length) {
-        const numberMatch = unsigned.slice(index).match(/^\d+(?:\.\d+)?/);
-        if (!numberMatch) {
-          throw new Error("整数、または 2M / 3.2R のようなSI記号付き数値を入力してください。");
-        }
-
-        index += numberMatch[0].length;
-        const symbol = symbols.find((candidate) => unsigned.startsWith(candidate, index));
-        if (symbol) {
-          index += symbol.length;
-          const [, integerPart, fractionPart = ""] = numberMatch[0].match(/^(\d+)(?:\.(\d+))?$/);
-          const power = siSymbolSystem.get(symbol);
-          if (fractionPart.length > power) {
-            throw new Error(`${numberMatch[0]}${symbol} は整数に変換できません。`);
-          }
-          const digits = `${integerPart}${fractionPart}`;
-          total += BigInt(digits) * 10n ** BigInt(power - fractionPart.length);
-        } else {
-          if (numberMatch[0].includes(".")) {
-            throw new Error("小数はSI記号付きで入力してください。");
-          }
-          total += BigInt(numberMatch[0]);
-        }
-      }
-
-      return sign * total;
-    };
-
-    const getSiSymbols = () => [...siSymbolSystem.keys()].sort((a, b) => b.length - a.length);
-
-    const parseSingleSiInput = (text) => {
-      const raw = normalizeInput(text);
-      const sign = raw.startsWith("-") ? "-" : "";
-      const unsigned = raw.replace(/^[+-]/, "");
-      const symbol = getSiSymbols().find((candidate) => unsigned.endsWith(candidate));
-      if (!symbol) return null;
-
-      const number = unsigned.slice(0, -symbol.length);
-      if (!/^\d+(?:\.\d+)?$/.test(number)) return null;
-      return { sign, number, symbol };
-    };
-
-    const normalizeDecimal = (text) => {
-      let [integerPart, fractionPart = ""] = text.split(".");
-      integerPart = integerPart.replace(/^0+(?=\d)/, "") || "0";
-      fractionPart = fractionPart.replace(/0+$/, "");
-      return fractionPart ? `${integerPart}.${fractionPart}` : integerPart;
-    };
-
-    const scaleDecimalBy10 = (text, exponent) => {
-      const normalized = normalizeDecimal(text);
-      const [integerPart, fractionPart = ""] = normalized.split(".");
-      const digits = `${integerPart}${fractionPart}`.replace(/^0+(?=\d)/, "") || "0";
-      const point = digits.length - fractionPart.length + exponent;
-
-      if (point <= 0) {
-        return normalizeDecimal(`0.${"0".repeat(-point)}${digits}`);
-      }
-      if (point >= digits.length) {
-        return normalizeDecimal(`${digits}${"0".repeat(point - digits.length)}`);
-      }
-      return normalizeDecimal(`${digits.slice(0, point)}.${digits.slice(point)}`);
+      maxInfo.textContent = `表現できる最大値: 10^${maxPower + 4} - 1（最大単位: ${NUMERAL_SYSTEM.get(maxPower)}）\n使えるSI単位系: ${symbols}`;
     };
 
     const scaleInputBy10 = (exponent) => {
-      const siInput = parseSingleSiInput(input.value);
+      const siInput = parseSingleSiInput(input.value, SI_SYMBOL_SYSTEM);
       if (siInput) {
         input.value = `${siInput.sign}${scaleDecimalBy10(siInput.number, exponent)}${siInput.symbol}`;
         convert();
@@ -458,7 +255,7 @@
     };
 
     const getInputBigInt = () => {
-      return parseInputBigInt(input.value);
+      return parseSiInputBigInt(input.value, SI_SYMBOL_SYSTEM);
     };
 
     const setInputBigInt = (value) => {
@@ -488,12 +285,9 @@
     };
 
     const convert = () => {
-      if (!numeralSystem || !siSymbolSystem) return;
-
       try {
-        output.value = bigintToKanji(parseInputBigInt(input.value), numeralSystem);
+        output.value = bigintToKanji(parseSiInputBigInt(input.value, SI_SYMBOL_SYSTEM), NUMERAL_SYSTEM);
         status.classList.remove("error");
-        if (!status.textContent) status.textContent = "変換しました。";
       } catch (error) {
         output.value = "";
         status.textContent = error.message;
@@ -541,8 +335,7 @@
       }
     });
     maxButton.addEventListener("click", () => {
-      if (!numeralSystem) return;
-      setInputBigInt(getMaxValue(numeralSystem));
+      setInputBigInt(getMaxValue(NUMERAL_SYSTEM));
     });
     clearButton.addEventListener("click", () => {
       input.value = "";
@@ -558,16 +351,8 @@
       status.classList.remove("error");
     });
 
-    try {
-      const systems = await loadNumeralSystems();
-      numeralSystem = systems.numeral;
-      siSymbolSystem = systems.siSymbols;
-      updateMaxInfo();
-      convert();
-    } catch (error) {
-      status.textContent = `CSVの取得に失敗しました: ${error.message}`;
-      status.classList.add("error");
-    }
+    updateMaxInfo();
+    convert();
   </script>
 </body>
 </html>
