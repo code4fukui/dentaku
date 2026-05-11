@@ -1,5 +1,7 @@
 # dentaku
 
+> 日本語のREADMEはこちらです: [README.ja.md](README.ja.md)
+
 A simple web app that converts JavaScript `BigInt`-sized integers into Japanese kanji numerals.
 
 Public site:
@@ -8,35 +10,25 @@ https://code4fukui.github.io/dentaku/
 
 Japanese README:
 
-[README.ja.md](README.ja.md)
-
 ## Features
 
-- Converts arbitrary-size integers to kanji numerals using `BigInt`
-- Uses embedded Japanese numeral units and SI prefix symbols
-- Supports negative integers
-- Allows comma-separated numbers such as `1,234,567`
-- Accepts SI symbol input such as `2M`, `3.2R`, and `1G234M567k890`
-- Provides utility buttons:
-  - square
-  - integer square root
-  - multiply by 10
-  - divide by 10 with integer division
-  - maximum representable value
-  - clear
-  - copy result
-- Shows the maximum value representable by the embedded numeral data
+-   **Arbitrary-Precision Conversion**: Converts any `BigInt`-sized integer into traditional Japanese kanji numerals.
+-   **Flexible Input**: Accepts multiple formats:
+    -   Standard integers (`12345`)
+    -   Negative numbers (`-123`)
+    -   Comma-separated values (`1,234,567`)
+    -   SI prefix symbols (`2M`, `3.2R`, `1G234M567k890`)
+-   **Utility Functions**: Includes one-click buttons for common operations:
+    -   Square (`x²`)
+    -   Integer Square Root (`√x`)
+    -   Multiply by 10 (`×10`)
+    -   Divide by 10 (integer division, `÷10`)
+    -   Insert maximum value
+    -   Clear input and copy result
 
-## Data Sources
+## Usage as an ES Module
 
-The numeral data is embedded in [numconverter.js](numconverter.js). It is based on:
-
-- https://github.com/code4fukui/music-numeral-system/blob/main/numeral-system.ja.csv
-- https://github.com/code4fukui/music-numeral-system/blob/main/numeral-system.en.csv
-
-## ES Module
-
-The conversion logic is available from [numconverter.js](numconverter.js):
+The core conversion logic is exported from `numconverter.js` and can be used in other projects.
 
 ```js
 import {
@@ -46,43 +38,39 @@ import {
   parseSiInputBigInt,
 } from "./numconverter.js";
 
+// 3.2R is 3.2 * 10^27
 const value = parseSiInputBigInt("3.2R", SI_SYMBOL_SYSTEM);
+
+// Outputs: 三千二百秭
 console.log(bigintToKanji(value, NUMERAL_SYSTEM));
-```
-
-## Maximum Value
-
-The app groups digits by 4 and uses the largest 10-power unit available in the embedded numeral data.
-
-With the current data, the largest unit is `10^68` (`無量大数`), so the largest representable value is:
-
-```txt
-10^72 - 1
 ```
 
 ## Run Locally
 
-This is a static web app. Serve the directory with any local HTTP server:
+This is a static web app. To run it, serve the project directory with a local HTTP server.
 
 ```sh
+# Using Python
 python3 -m http.server 8000
 ```
 
-Then open:
+Then open `http://localhost:8000/` in your browser.
 
-```txt
-http://localhost:8000/
-```
+*Note: Opening the `index.html` file directly from the filesystem may not work because the app relies on ES modules, which require a server environment.*
 
-Opening the file directly may fail because the app uses ES modules, so using a local server is recommended.
+## Technical Notes
 
-## Notes
+-   **Maximum Value**: The largest embedded numeral unit is `無量大数` (muryōtaisū) for 10⁶⁸. The app groups digits by four, making the maximum representable value `10^72 - 1`.
+-   **Precision**: SI symbol inputs are converted to `BigInt` by manipulating their string representations to avoid floating-point precision loss. For example, `3.2R` becomes `3200000000000000000000000000n`.
+-   **SI Symbol Scaling**: When the input is a single SI-prefixed value (e.g., `1Q`), the `×10` and `÷10` buttons modify the decimal part (`10Q`, `0.1Q`) rather than converting to a `BigInt` first.
+-   **Bundled Data**: Numeral and SI symbol data are embedded directly in `numconverter.js` for performance; the app does not fetch CSV files at runtime.
 
-The app does not fetch CSV files at runtime. Numeral data is bundled in the ES module.
+## Data Sources
 
-SI symbol input is converted exactly as decimal text, not as floating-point math. For example, `2M` means `2 * 10^6`, `3.2R` means `3.2 * 10^27`, and `1G234M567k890` means `1,234,567,890`.
+The numeral data is based on the following files from the `music-numeral-system` project:
 
-When the input is a single SI-symbol value, the `multiply by 10` and `divide by 10` buttons keep the symbol in the input field. For example, `1Q` becomes `10Q`, and dividing `1Q` by 10 becomes `0.1Q`.
+-   [numeral-system.ja.csv](https://github.com/code4fukui/music-numeral-system/blob/main/numeral-system.ja.csv)
+-   [numeral-system.en.csv](https://github.com/code4fukui/music-numeral-system/blob/main/numeral-system.en.csv)
 
 ## License
 
